@@ -1,0 +1,4 @@
+venv/
+.venv/
+jenos/dataset/ia/faces/*
+jenos/dataset/real/faces/*
