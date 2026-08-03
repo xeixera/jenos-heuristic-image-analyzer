@@ -26,22 +26,21 @@ from common import ehArquivoDeImagemValido
 DIRETORIO_DATASET = "dataset"
 DIRETORIO_SAIDA = "output"
 
-
 def listarClasses(diretorioReal: str) -> list:
     if not os.path.isdir(diretorioReal):
         return []
     return sorted([
-        nome for nome in os.listdir(diretorioReal)
-        if os.path.isdir(os.path.join(diretorioReal, nome))
+        nomeClasse for nomeClasse in os.listdir(diretorioReal)
+        if os.path.isdir(os.path.join(diretorioReal, nomeClasse))
     ])
 
 
 def extrairFeaturesDeDiretorio(diretorio: str) -> list:
 #Extrai as features de todas as imagens válidas presentes em um diretório, retornando uma lista de dicionários
 #contendo as características extraídas e o nome de cada arquivo.
-    resultados = []
+    listaFeatures = []
     if not os.path.isdir(diretorio):
-        return resultados
+        return listaFeatures
 
     for nomeArquivo in sorted(os.listdir(diretorio)):
         if not ehArquivoDeImagemValido(nomeArquivo):
@@ -51,16 +50,16 @@ def extrairFeaturesDeDiretorio(diretorio: str) -> list:
         try:
             caracteristicas = extrairCaracteristicas(caminhoCompleto)
             caracteristicas["_arquivo"] = nomeArquivo
-            resultados.append(caracteristicas)
+            listaFeatures.append(caracteristicas)
             print(f"  OK: {nomeArquivo}")
         except Exception as erro:
             print(f"  ERRO: {nomeArquivo} -> {erro}")
 
-    return resultados
+    return listaFeatures
 
 
 def calcularBaseline(listaCaracteristicas: list) -> dict:
-    """Baseline estatístico (media/desvio/percentis) - só para imagens reais."""
+    #Baseline estatístico (media/desvio/percentis) para imagens reais.
     if not listaCaracteristicas:
         return {}
 
@@ -70,9 +69,9 @@ def calcularBaseline(listaCaracteristicas: list) -> dict:
     ]
 
     baseline = {}
-    for nome in nomesNumericos:
-        valores = [item[nome] for item in listaCaracteristicas]
-        baseline[nome] = {
+    for nomeCaracteristica in nomesNumericos:
+        valores = [registro[nomeCaracteristica] for registro in listaCaracteristicas]
+        baseline[nomeCaracteristica] = {
             "media": float(np.mean(valores)),
             "desvioPadrao": float(np.std(valores) + 1e-8),
             "percentil95": float(np.percentile(valores, 95)),
@@ -99,8 +98,8 @@ def processarClasse(classe: str):
     if len(featuresIA) == 0:
         print(
             f"AVISO: nenhuma imagem de IA encontrada para a classe '{classe}'. "
-            f"O baseline será gerado, mas o dataset rotulado ficará incompleto "
-            f"(train_classifier.py exige as duas classes)."
+            "O baseline será gerado, mas o dataset rotulado ficará incompleto "
+            "(train_classifier.py exige as duas classes)."
         )
 
     os.makedirs(DIRETORIO_SAIDA, exist_ok=True)
@@ -113,20 +112,21 @@ def processarClasse(classe: str):
     print(f"Baseline salvo em: {caminhoBaseline}")
 
     #dataset rotulado (reais+IA) para treino do classificador, ideia de versão final
+    #0 = real / #1 = gerado/editado por IA
     linhas = []
-    for item in featuresReais:
-        linha = {k: v for k, v in item.items() if not k.startswith("_")}
-        linha["rotulo"] = 0  # 0 = real
+    for registro in featuresReais:
+        linha = {chave: valor for chave, valor in registro.items() if not chave.startswith("_")}
+        linha["rotulo"] = 0 
         linhas.append(linha)
-    for item in featuresIA:
-        linha = {k: v for k, v in item.items() if not k.startswith("_")}
-        linha["rotulo"] = 1  # 1 = gerado/editado por IA
+    for registro in featuresIA:
+        linha = {chave: valor for chave, valor in registro.items() if not chave.startswith("_")}
+        linha["rotulo"] = 1  
         linhas.append(linha)
 
-    dataframe = pd.DataFrame(linhas)
+    dataFrame = pd.DataFrame(linhas)
     caminhoDataset = os.path.join(DIRETORIO_SAIDA, f"features_{classe}.csv")
-    dataframe.to_csv(caminhoDataset, index=False)
-    print(f"Dataset rotulado salvo em: {caminhoDataset} ({len(dataframe)} amostras)")
+    dataFrame.to_csv(caminhoDataset, index=False)
+    print(f"Dataset rotulado salvo em: {caminhoDataset} ({len(dataFrame)} amostras)")
 
 
 def main():

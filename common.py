@@ -21,7 +21,7 @@ EXTENSOES_VALIDAS = {".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".tif", ".webp"}
 
 
 def ehArquivoDeImagemValido(nomeArquivo: str) -> bool:
-    """Filtra arquivos que não são imagens (ex: .DS_Store, Thumbs.db)."""
+    #filtra formatos que não são imagens (.wav, .pdf)
     _, extensao = os.path.splitext(nomeArquivo)
     return extensao.lower() in EXTENSOES_VALIDAS
 

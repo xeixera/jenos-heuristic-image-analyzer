@@ -66,12 +66,12 @@ def construirModelo(tipoModelo: str):
 def treinarClasse(classe: str, tipoModelo: str = "random_forest", testeProporcao: float = 0.25):
     print(f"\nTreinando classificador para: {classe} ")
 
-    dataframe = carregarDataset(classe)
+    dataFrame = carregarDataset(classe)
 
-    if "rotulo" not in dataframe.columns:
+    if "rotulo" not in dataFrame.columns:
         raise Exception(f"Dataset de '{classe}' não tem coluna 'rotulo'.")
 
-    contagem = dataframe["rotulo"].value_counts().to_dict()
+    contagem = dataFrame["rotulo"].value_counts().to_dict()
     print(f"Amostras -> real: {contagem.get(0, 0)} | ia: {contagem.get(1, 0)}")
 
     if contagem.get(0, 0) < 10 or contagem.get(1, 0) < 10:
@@ -81,9 +81,9 @@ def treinarClasse(classe: str, tipoModelo: str = "random_forest", testeProporcao
             "trate como teste de fumaça do pipeline, não como validação real."
         )
 
-    colunasFeature = [c for c in dataframe.columns if c not in ("rotulo", "_arquivo")]
-    X = dataframe[colunasFeature].values
-    y = dataframe["rotulo"].values
+    colunasFeature = [nomeColuna for nomeColuna in dataFrame.columns if nomeColuna not in ("rotulo", "_arquivo")]
+    X = dataFrame[colunasFeature].values
+    y = dataFrame["rotulo"].values
 
     XTreino, XTeste, yTreino, yTeste = train_test_split(
         X, y, test_size=testeProporcao, stratify=y, random_state=42
@@ -102,7 +102,7 @@ def treinarClasse(classe: str, tipoModelo: str = "random_forest", testeProporcao
         "f1": float(f1_score(yTeste, yPred, zero_division=0)),
         "matrizConfusao": confusion_matrix(yTeste, yPred).tolist(),
     }
-    # AUC-ROC exige as duas classes presentes no teste (em testes)
+    #AUC-ROC exige as duas classes presentes no teste (em testes)
     if len(set(yTeste)) == 2:
         metricas["aucRoc"] = float(roc_auc_score(yTeste, yProba))
 
@@ -121,7 +121,7 @@ def treinarClasse(classe: str, tipoModelo: str = "random_forest", testeProporcao
     if hasattr(modelo, "feature_importances_"):
         importancias = sorted(
             zip(colunasFeature, modelo.feature_importances_.tolist()),
-            key=lambda item: item[1], reverse=True,
+            key=lambda parImportancia: parImportancia[1], reverse=True,
         )
         print("\nFeatures mais relevantes para esta classe:")
         for nome, valor in importancias[:10]:

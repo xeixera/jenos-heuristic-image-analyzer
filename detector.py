@@ -46,42 +46,37 @@ def carregarBaseline(classe: str) -> dict:
 
 
 def gerarEvidencias(caracteristicas: dict, baseline: dict, modelo, colunasFeature: list, top_n: int = 5) -> list:
-    """
-    Gera uma lista de evidências legíveis, combinando:
-    - o quanto a feature se desvia do baseline de imagens reais (z-score)
-    - a importância dessa feature para o modelo treinado (quando disponível)
-    Isso mantém o espírito do relatório de evidências do protótipo
-    original, mas prioriza as features que o modelo de fato usa para
-    decidir, em vez de listar qualquer anomalia estatística.
-    """
+#Gera uma lista de evidências legíveis, combinando o quanto a feature se desvia do baseline de imagens reais (z-score)
+#e a importância dessa feature para o modelo treinado (quando disponível)
+
     importancias = {}
     if hasattr(modelo, "feature_importances_"):
         importancias = dict(zip(colunasFeature, modelo.feature_importances_))
 
     evidencias = []
-    for nome in colunasFeature:
-        if nome not in baseline or nome not in caracteristicas:
+    for nomeFeature in colunasFeature:
+        if nomeFeature not in baseline or nomeFeature not in caracteristicas:
             continue
-        media = baseline[nome]["media"]
-        desvio = baseline[nome]["desvioPadrao"]
+        media = baseline[nomeFeature]["media"]
+        desvio = baseline[nomeFeature]["desvioPadrao"]
         if desvio == 0:
             continue
 
-        zScore = abs((caracteristicas[nome] - media) / desvio)
-        pesoImportancia = importancias.get(nome, 0.0)
+        zScore = abs((caracteristicas[nomeFeature] - media) / desvio)
+        pesoImportancia = importancias.get(nomeFeature, 0.0)
 
         #score combinado: desvio estatístico ponderado pela relevância da feature no modelo
         scoreEvidencia = zScore * (pesoImportancia if importancias else 1.0)
 
         if zScore > 2:
             evidencias.append({
-                "feature": nome,
+                "feature": nomeFeature,
                 "zScore": round(float(zScore), 2),
                 "importanciaModelo": round(float(pesoImportancia), 4) if importancias else None,
                 "scoreEvidencia": round(float(scoreEvidencia), 4),
             })
 
-    evidencias.sort(key=lambda item: item["scoreEvidencia"], reverse=True)
+    evidencias.sort(key=lambda evidencia: evidencia["scoreEvidencia"], reverse=True)
     return evidencias[:top_n]
 
 
@@ -95,9 +90,9 @@ def analisarImagem(caminhoImagem: str, classe: str, modeloCarregado=None, baseli
     colunasFeature = modeloCarregado["colunasFeature"]
 
     caracteristicas = extrairCaracteristicas(caminhoImagem)
-    caracteristicasNumericas = {k: v for k, v in caracteristicas.items() if not k.startswith("_")}
+    caracteristicasNumericas = {chave: valor for chave, valor in caracteristicas.items() if not chave.startswith("_")}
 
-    vetor = np.array([[caracteristicasNumericas.get(nome, 0.0) for nome in colunasFeature]])
+    vetor = np.array([[caracteristicasNumericas.get(nomeFeature, 0.0) for nomeFeature in colunasFeature]])
     probabilidadeIA = float(modelo.predict_proba(vetor)[0, 1])
 
     evidencias = gerarEvidencias(caracteristicasNumericas, baseline, modelo, colunasFeature)
@@ -123,8 +118,8 @@ def modoUnico(caminhoImagem: str, classe: str):
         )
     if resultado["evidencias"]:
         print("\nPrincipais evidências:")
-        for ev in resultado["evidencias"]:
-            print(f"  {ev['feature']}: z={ev['zScore']} (importância no modelo: {ev['importanciaModelo']})")
+        for evidencia in resultado["evidencias"]:
+            print(f"  {evidencia['feature']}: z={evidencia['zScore']} (importância no modelo: {evidencia['importanciaModelo']})")
     else:
         print("\nNenhuma evidência estatística relevante (z > 2) encontrada.")
 
@@ -149,8 +144,8 @@ def modoBatch(diretorio: str, classe: str, caminhoSaida: str):
         except Exception as erro:
             print(f"ERRO: {nomeArquivo} -> {erro}")
 
-    dataframe = pd.DataFrame(linhas)
-    dataframe.to_csv(caminhoSaida, index=False)
+    dataFrame = pd.DataFrame(linhas)
+    dataFrame.to_csv(caminhoSaida, index=False)
     print(f"\nResultados salvos em: {caminhoSaida}")
 
 

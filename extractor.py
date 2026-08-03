@@ -18,7 +18,6 @@
 #Agora o código guarda o formato original do arquivo (JPEG, PNG e etc) junto ao resultado, por que isso termina
 #afetando a interpretação forense do ELA dependendo do formato.
 
-
 import json
 import numpy as np
 import cv2
@@ -53,26 +52,26 @@ def extrairCaracteristicas(caminhoImagem: str) -> dict:
     imagemOriginal = carregarImagemPadronizada(caminhoImagem)
     ehJpeg = formatoOriginalEhJpeg(caminhoImagem)
 
-    # gray
+    #gray
     imagemCinza = cv2.cvtColor(imagemOriginal, cv2.COLOR_BGR2GRAY)
     alturaImagem, larguraImagem = imagemCinza.shape
 
-    # kernelsize (proporcional - agora consistente em todo o pipeline)
+    #kernelsize (proporcional - agora consistente em todo o pipeline)
     tamanhoKernel = max(3, int(min(alturaImagem, larguraImagem) * 0.005))
     if tamanhoKernel % 2 == 0:
         tamanhoKernel += 1
 
-    # noise
+    #noise
     imagemDesfocada = cv2.GaussianBlur(imagemCinza, (tamanhoKernel, tamanhoKernel), 0)
     residuoRuido = imagemCinza.astype(np.float32) - imagemDesfocada.astype(np.float32)
     listaValorRuido = residuoRuido.flatten()
 
-    # PRNU (aproximado)
+    #PRNU (aproximado)
     imagemDenoised = cv2.fastNlMeansDenoising(imagemCinza, None, 7, 7, 21)
     residuoPRNU = imagemCinza.astype(np.float32) - imagemDenoised.astype(np.float32)
     listaValorPRNU = residuoPRNU.flatten()
 
-    # FFT
+    #FFT
     fftImagem = np.fft.fft2(imagemCinza)
     fftCentralizada = np.fft.fftshift(fftImagem)
     fftMagnitude = np.log(np.abs(fftCentralizada) + 1)
@@ -81,25 +80,25 @@ def extrairCaracteristicas(caminhoImagem: str) -> dict:
     picosRadiais, _ = find_peaks(perfilRadial)
     diferencaRadial = np.diff(perfilRadial)
 
-    # entropy
+    #entropy
     mapaEntropia = entropy(imagemCinza, disk(5))
     listaValorEntropia = mapaEntropia.flatten()
 
-    # ELA (agora com arquivo temporário seguro e único)
+    #ELA (agora com arquivo temporário seguro e único)
     with ArquivoTemporarioELA(imagemOriginal, qualidade=90) as caminhoTemporarioELA:
         imagemRecomprimida = cv2.imread(caminhoTemporarioELA)
         imagemELA = cv2.absdiff(imagemOriginal, imagemRecomprimida)
         imagemELACinza = cv2.cvtColor(imagemELA, cv2.COLOR_BGR2GRAY)
         listaValorELA = imagemELACinza.flatten()
 
-    # wavelet
+    #wavelet
     coeficientesWavelet = pywt.wavedec2(imagemCinza, 'haar', level=2)
     energiaWavelet = []
     for nivel in coeficientesWavelet[1:]:
         for subbanda in nivel:
             energiaWavelet.append(np.mean(np.abs(subbanda)))
 
-    # CFA
+    #CFA
     linhasPares = imagemCinza[::2, :]
     linhasImpares = imagemCinza[1::2, :]
     minimoLinhas = min(linhasPares.shape[0], linhasImpares.shape[0])
@@ -111,80 +110,79 @@ def extrairCaracteristicas(caminhoImagem: str) -> dict:
         linhasImpares.astype(np.float32)
     ))
 
-    # ruído cromático (kernel agora proporcional, igual ao restante do pipeline)
-    canalB, canalG, canalR = cv2.split(imagemOriginal)
+    #ruído cromático (kernel agora proporcional, igual ao restante do pipeline)
+    canalAzul, canalVerde, canalVermelho = cv2.split(imagemOriginal)
 
     ruidoVermelho = np.std(
-        canalR.astype(np.float32) - cv2.GaussianBlur(canalR, (tamanhoKernel, tamanhoKernel), 0)
+        canalVermelho.astype(np.float32) - cv2.GaussianBlur(canalVermelho, (tamanhoKernel, tamanhoKernel), 0)
     )
     ruidoVerde = np.std(
-        canalG.astype(np.float32) - cv2.GaussianBlur(canalG, (tamanhoKernel, tamanhoKernel), 0)
+        canalVerde.astype(np.float32) - cv2.GaussianBlur(canalVerde, (tamanhoKernel, tamanhoKernel), 0)
     )
     ruidoAzul = np.std(
-        canalB.astype(np.float32) - cv2.GaussianBlur(canalB, (tamanhoKernel, tamanhoKernel), 0)
+        canalAzul.astype(np.float32) - cv2.GaussianBlur(canalAzul, (tamanhoKernel, tamanhoKernel), 0)
     )
 
-    # saturação
+    #saturação
     imagemHSV = cv2.cvtColor(imagemOriginal, cv2.COLOR_BGR2HSV)
     canalSaturacao = imagemHSV[:, :, 1]
 
-    # LAB
+    #LAB (nomes com sufixo Lab para não colidir com os canais RGB acima)
     imagemLAB = cv2.cvtColor(imagemOriginal, cv2.COLOR_BGR2LAB)
-    _, canalA, canalB = cv2.split(imagemLAB)
+    _, canalLabA, canalLabB = cv2.split(imagemLAB)
 
-    # canny edge
+    #canny-edge
     mapaBordas = cv2.Canny(imagemCinza, 100, 200)
     densidadeBordas = np.mean(mapaBordas > 0)
 
     caracteristicas = {
-        # RUÍDO
+        #RUÍDO
         "valorRuidoDesvio": float(np.std(listaValorRuido)),
         "valorRuidoAssimetria": float(skew(listaValorRuido)),
         "valorRuidoCurtose": float(kurtosis(listaValorRuido)),
-        # PRNU
+        #PRNU
         "valorPRNUDesvio": float(np.std(listaValorPRNU)),
         "valorPRNUAssimetria": float(skew(listaValorPRNU)),
         "valorPRNUCurtose": float(kurtosis(listaValorPRNU)),
-        # FFT
+        #FFT
         "valorFFTDesvio": float(np.std(listaValorFFT)),
         "valorFFTAssimetria": float(skew(listaValorFFT)),
         "valorFFTCurtose": float(kurtosis(listaValorFFT)),
-        # RADIAL FFT
+        #RADIAL FFT
         "valorRadialDesvio": float(np.std(perfilRadial)),
         "valorRadialPicos": int(len(picosRadiais)),
         "valorRadialEnergia": float(np.mean(np.abs(diferencaRadial))),
         "valorRadialCurtose": float(kurtosis(perfilRadial)),
-        # ENTROPIA
+        #ENTROPIA
         "valorEntropiaMedia": float(np.mean(listaValorEntropia)),
         "valorEntropiaDesvio": float(np.std(listaValorEntropia)),
         "valorEntropiaAssimetria": float(skew(listaValorEntropia)),
         "valorEntropiaCurtose": float(kurtosis(listaValorEntropia)),
-        # ELA
+        #ELA
         "valorELADesvio": float(np.std(listaValorELA)),
         "valorELAEntropia": float(shannon_entropy(imagemELACinza)),
         "valorELACurtose": float(kurtosis(listaValorELA)),
-        # WAVELET
+        #WAVELET
         "valorWaveletMedia": float(np.mean(energiaWavelet)),
         "valorWaveletDesvio": float(np.std(energiaWavelet)),
-        # CFA
+        #CFA
         "valorCFADiferenca": float(diferencaCFA),
-        # RUÍDO CROMÁTICO
+        #RUÍDO CROMÁTICO
         "valorRuidoVermelho": float(ruidoVermelho),
         "valorRuidoVerde": float(ruidoVerde),
         "valorRuidoAzul": float(ruidoAzul),
-        # SATURAÇÃO
+        #SATURAÇÃO
         "valorSaturacaoMedia": float(np.mean(canalSaturacao)),
         "valorSaturacaoDesvio": float(np.std(canalSaturacao)),
-        # LAB
-        "valorLabADesvio": float(np.std(canalA)),
-        "valorLabBDesvio": float(np.std(canalB)),
-        # BORDAS
+        #LAB
+        "valorLabADesvio": float(np.std(canalLabA)),
+        "valorLabBDesvio": float(np.std(canalLabB)),
+        #BORDAS
         "valorDensidadeBordas": float(densidadeBordas),
     }
 
-    # Metadado (não usado como feature numérica direta no classificador,
-    # mas registrado para permitir análise/filtro posterior, ex: separar
-    # o desempenho do modelo para imagens de origem JPEG vs PNG).
+    #Metadado (não usado como feature numérica direta no classificador, mas registrado para permitir análise/filtro
+    #posterior, ex: separar o desempenho do modelo para imagens de origem JPEG vs PNG).
     caracteristicas["_metadadoFormatoOriginalJpeg"] = bool(ehJpeg)
 
     return caracteristicas
