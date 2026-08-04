@@ -1,4 +1,4 @@
-#trainer.py
+#train_classifier.py
 
 #To passando uma fome grande aqui por que a primeira vez mexendo com isso
 

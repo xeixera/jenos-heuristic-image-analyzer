@@ -1,0 +1,188 @@
+{
+    "valorRuidoDesvio": {
+        "media": 0.6174989941445264,
+        "desvioPadrao": 0.26833997231594614,
+        "percentil95": 1.1494079411029816,
+        "percentil99": 1.6828714370727538
+    },
+    "valorRuidoAssimetria": {
+        "media": 0.06790027154122734,
+        "desvioPadrao": 0.18637635720623427,
+        "percentil95": 0.3896193355321884,
+        "percentil99": 0.5070767259597778
+    },
+    "valorRuidoCurtose": {
+        "media": 13.807664307680996,
+        "desvioPadrao": 7.365895182918062,
+        "percentil95": 26.734408378601067,
+        "percentil99": 37.14329196929931
+    },
+    "valorPRNUDesvio": {
+        "media": 1.590917807817459,
+        "desvioPadrao": 0.2918478395109754,
+        "percentil95": 2.1332072973251344,
+        "percentil99": 2.282785685062408
+    },
+    "valorPRNUAssimetria": {
+        "media": 0.006010492600034922,
+        "desvioPadrao": 0.05256001584787272,
+        "percentil95": 0.0982887804508209,
+        "percentil99": 0.1453607542812824
+    },
+    "valorPRNUCurtose": {
+        "media": 2.3718432556499134,
+        "desvioPadrao": 1.0235987599038765,
+        "percentil95": 4.540834140777587,
+        "percentil99": 5.02906641960144
+    },
+    "valorFFTDesvio": {
+        "media": 1.2813585259610487,
+        "desvioPadrao": 0.09056080023146378,
+        "percentil95": 1.4492871548780024,
+        "percentil99": 1.522306574890637
+    },
+    "valorFFTAssimetria": {
+        "media": 1.7302356213666337,
+        "desvioPadrao": 0.12830631305679208,
+        "percentil95": 1.976197602108411,
+        "percentil99": 2.006242730986423
+    },
+    "valorFFTCurtose": {
+        "media": 5.343585663379045,
+        "desvioPadrao": 1.1189457653214558,
+        "percentil95": 7.090599430047726,
+        "percentil99": 7.8791767354940125
+    },
+    "valorRadialDesvio": {
+        "media": 2.0409731135957854,
+        "desvioPadrao": 0.10057289428810803,
+        "percentil95": 2.1975845186105216,
+        "percentil99": 2.296213888668839
+    },
+    "valorRadialPicos": {
+        "media": 220.93636363636364,
+        "desvioPadrao": 6.903592319577639,
+        "percentil95": 231.0,
+        "percentil99": 235.73
+    },
+    "valorRadialEnergia": {
+        "media": 0.0466133785786065,
+        "desvioPadrao": 0.001960068113095084,
+        "percentil95": 0.05022786932147595,
+        "percentil99": 0.05139130197952278
+    },
+    "valorRadialCurtose": {
+        "media": 5.006541599246547,
+        "desvioPadrao": 1.4723235790401183,
+        "percentil95": 7.6230280738888325,
+        "percentil99": 9.04082055070222
+    },
+    "valorEntropiaMedia": {
+        "media": 2.965558721158124,
+        "desvioPadrao": 0.5041478780901665,
+        "percentil95": 3.7711433068883626,
+        "percentil99": 4.104790354391753
+    },
+    "valorEntropiaDesvio": {
+        "media": 1.4671539414664927,
+        "desvioPadrao": 0.2275937264270217,
+        "percentil95": 1.843994055990895,
+        "percentil99": 1.9406409692408846
+    },
+    "valorEntropiaAssimetria": {
+        "media": -0.18790680834268275,
+        "desvioPadrao": 0.3645022602266125,
+        "percentil95": 0.3946190457339266,
+        "percentil99": 0.5665772372547604
+    },
+    "valorEntropiaCurtose": {
+        "media": -0.6579496435237588,
+        "desvioPadrao": 0.5507503618706612,
+        "percentil95": 0.08996374487168277,
+        "percentil99": 1.2142220274721882
+    },
+    "valorELADesvio": {
+        "media": 0.5262357872190327,
+        "desvioPadrao": 0.027503966811208286,
+        "percentil95": 0.5708288275043503,
+        "percentil99": 0.6082738911213772
+    },
+    "valorELAEntropia": {
+        "media": 1.0731742979740808,
+        "desvioPadrao": 0.07716794098580404,
+        "percentil95": 1.1976248716388247,
+        "percentil99": 1.2778422863468775
+    },
+    "valorELACurtose": {
+        "media": -0.6898799494163537,
+        "desvioPadrao": 0.3770591242073547,
+        "percentil95": 0.1345859243013009,
+        "percentil99": 0.3863372583410406
+    },
+    "valorWaveletMedia": {
+        "media": 2.141052991693672,
+        "desvioPadrao": 0.8558606644356815,
+        "percentil95": 3.565542538960776,
+        "percentil99": 5.463806002934774
+    },
+    "valorWaveletDesvio": {
+        "media": 1.8860726141827848,
+        "desvioPadrao": 0.7068705055901086,
+        "percentil95": 3.131836969927062,
+        "percentil99": 4.458067438896683
+    },
+    "valorCFADiferenca": {
+        "media": 1.158643930608576,
+        "desvioPadrao": 0.47315474036394856,
+        "percentil95": 1.8249361991882325,
+        "percentil99": 2.91117036819458
+    },
+    "valorRuidoVermelho": {
+        "media": 0.6124687617475336,
+        "desvioPadrao": 0.27102384287139636,
+        "percentil95": 1.1544650733470916,
+        "percentil99": 1.6846477067470549
+    },
+    "valorRuidoVerde": {
+        "media": 0.607281969352202,
+        "desvioPadrao": 0.27311239871913423,
+        "percentil95": 1.1526866137981415,
+        "percentil99": 1.6871368122100827
+    },
+    "valorRuidoAzul": {
+        "media": 0.6055657856843688,
+        "desvioPadrao": 0.2681609038384684,
+        "percentil95": 1.1368607461452485,
+        "percentil99": 1.6611036324501036
+    },
+    "valorSaturacaoMedia": {
+        "media": 92.42863870100541,
+        "desvioPadrao": 30.681744721029823,
+        "percentil95": 146.06277017593385,
+        "percentil99": 153.39079855918882
+    },
+    "valorSaturacaoDesvio": {
+        "media": 52.979899325134184,
+        "desvioPadrao": 13.426043058887133,
+        "percentil95": 75.99112784683975,
+        "percentil99": 80.39733847605666
+    },
+    "valorLabADesvio": {
+        "media": 8.786998420501952,
+        "desvioPadrao": 3.2777578459302448,
+        "percentil95": 14.788799126670385,
+        "percentil99": 19.679366145440603
+    },
+    "valorLabBDesvio": {
+        "media": 11.077809557012538,
+        "desvioPadrao": 4.4946635295353845,
+        "percentil95": 18.812839741571587,
+        "percentil99": 26.22288877817708
+    },
+    "valorDensidadeBordas": {
+        "media": 0.0020794434980912642,
+        "desvioPadrao": 0.003763714707185979,
+        "percentil95": 0.008179903030395506,
+        "percentil99": 0.02134065628051756
+    }
+}

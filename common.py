@@ -17,7 +17,7 @@ import tempfile
 
 TAMANHO_PADRAO = 1024
 
-EXTENSOES_VALIDAS = {".jpg", ".jpeg", ".png"}
+EXTENSOES_VALIDAS = {".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".tif", ".webp"}
 
 
 def ehArquivoDeImagemValido(nomeArquivo: str) -> bool:

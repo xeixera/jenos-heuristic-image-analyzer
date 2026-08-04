@@ -1,7 +1,7 @@
 #detector.py
 
 #Esse código recebe uma imagem (ou um diretório de imagens, no modo batch) e estima a probabilidade de ela ter
-#sido gerada ou editada por IA, utilizando o classificador treinado por trainer.py para a classe indicada.
+#sido gerada ou editada por IA, utilizando o classificador treinado por train_classifier.py para a classe indicada.
 
 #Mudanças em relação ao protótipo
 
@@ -32,7 +32,7 @@ def carregarModelo(classe: str):
     caminhoModelo = os.path.join(DIRETORIO_SAIDA, f"modelo_{classe}.joblib")
     if not os.path.exists(caminhoModelo):
         raise FileNotFoundError(
-            f"Modelo não encontrado: {caminhoModelo}. Rode trainer.py --classe {classe} primeiro."
+            f"Modelo não encontrado: {caminhoModelo}. Rode train_classifier.py --classe {classe} primeiro."
         )
     return joblib.load(caminhoModelo)
 
@@ -154,10 +154,10 @@ def main():
     parser.add_argument("--classe", required=True, help="Classe do modelo a usar (ex: faces, paisagens)")
 
     grupo = parser.add_mutually_exclusive_group(required=True)
-    grupo.add_argument("--image", help="Caminho de uma única imagem")
+    grupo.add_argument("--imagem", help="Caminho de uma única imagem")
     grupo.add_argument("--dir", help="Diretório com várias imagens (modo batch)")
 
-    parser.add_argument("--output", default="output/resultados_batch.csv", help="CSV de saída no modo batch")
+    parser.add_argument("--saida", default="output/resultados_batch.csv", help="CSV de saída no modo batch")
     args = parser.parse_args()
 
     if args.imagem:
