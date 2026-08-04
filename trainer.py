@@ -148,12 +148,12 @@ def treinarClasse(classe: str, tipoModelo: str = "random-forest", testeProporcao
 
 def main():
     parser = argparse.ArgumentParser(description="Treina o classificador Jenos por classe.")
-    parser.add_argument("--class", required=True, help="Nome da classe (ex: faces, paisagens)")
+    parser.add_argument("--class", dest="classe", required=True, help="Nome da classe (ex: faces, paisagens)")
     parser.add_argument("--model", default="random-forest", choices=["random-forest", "logistic"])
-    parser.add_argument("--teste-proporcao", type=float, default=0.25)
+    parser.add_argument("--holdout", type=float, default=0.25)
     args = parser.parse_args()
 
-    treinarClasse(args.classe, tipoModelo=args.modelo, testeProporcao=args.teste_proporcao)
+    treinarClasse(args.classe, tipoModelo=args.model, holdout=args.holdout)
 
 
 if __name__ == "__main__":
