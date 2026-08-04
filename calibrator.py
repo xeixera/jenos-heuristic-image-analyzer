@@ -1,7 +1,7 @@
 # calibrator.py
 
 #Gera, para cada classe, um baseline estatístico a partir das imagens reais e um dataset de features
-#rotulado (real=0 / ia=1), utilizado posteriormente pelo train_classifier.py para treinar o modelo.
+#rotulado (real=0 / ia=1), utilizado posteriormente pelo trainer.py para treinar o modelo.
 
 #Estrutura esperada:
 #dataset/
@@ -99,7 +99,7 @@ def processarClasse(classe: str):
         print(
             f"AVISO: nenhuma imagem de IA encontrada para a classe '{classe}'. "
             "O baseline será gerado, mas o dataset rotulado ficará incompleto "
-            "(train_classifier.py exige as duas classes)."
+            "(trainer.py exige as duas classes)."
         )
 
     os.makedirs(DIRETORIO_SAIDA, exist_ok=True)
