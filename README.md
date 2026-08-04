@@ -88,7 +88,7 @@ Gera `output/baseline_<classe>.json` e `output/features_<classe>.csv`.
 ```bash
 python3 trainer.py --class faces
 ```
-Opcional: `--model {random_forest, logistic}`, `--holdout 0.25`.
+Opcional: `--model {random-forest, logistic}`, `--holdout 0.25`.
 Gera `output/modelo_<classe>.joblib` e `output/metricas_<classe>.json`.
 
 **Passo 3 — Analisar**:

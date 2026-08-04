@@ -63,7 +63,7 @@ def construirModelo(tipoModelo: str):
     )
 
 
-def treinarClasse(classe: str, tipoModelo: str = "random_forest", testeProporcao: float = 0.25):
+def treinarClasse(classe: str, tipoModelo: str = "random-forest", testeProporcao: float = 0.25):
     print(f"\nTreinando classificador para: {classe} ")
 
     dataFrame = carregarDataset(classe)
@@ -149,7 +149,7 @@ def treinarClasse(classe: str, tipoModelo: str = "random_forest", testeProporcao
 def main():
     parser = argparse.ArgumentParser(description="Treina o classificador Jenos por classe.")
     parser.add_argument("--class", required=True, help="Nome da classe (ex: faces, paisagens)")
-    parser.add_argument("--model", default="random_forest", choices=["random_forest", "logistic"])
+    parser.add_argument("--model", default="random-forest", choices=["random-forest", "logistic"])
     parser.add_argument("--teste-proporcao", type=float, default=0.25)
     args = parser.parse_args()
 
