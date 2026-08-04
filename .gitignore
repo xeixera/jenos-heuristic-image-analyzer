@@ -1,4 +1,4 @@
 venv/
 .venv/
-#dataset/ia/faces/*
-#dataset/real/faces/*
+dataset/ia/faces/*
+dataset/real/faces/*
