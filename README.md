@@ -28,7 +28,7 @@ Cada imagem passa por **27 análises heurísticas**: ELA, análise de ruído/PRN
 
 ## 2. Estrutura do código
 
-![Texto alternativo da imagem](./assets/jenos-arch)
+![Texto alternativo da imagem](./assets/jenos-arch.png)
 
 O projeto separa duas frentes, que não se misturam:
 
