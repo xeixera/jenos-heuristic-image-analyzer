@@ -28,16 +28,7 @@ Cada imagem passa por **27 análises heurísticas**: ELA, análise de ruído/PRN
 
 ## 2. Estrutura do código
 
-```
-jenos/
-├── common.py               #pré-processamento padrão (resize 1024x1024, ELA seguro)
-├── extractor.py            #extrai as características heurísticas de uma imagem
-├── calibrator.py           #monta baseline + dataset rotulado, por classe
-├── trainer.py              #treina o classificador (real vs. IA), por classe
-├── detector.py             #CLI de análise (imagem única ou lote)
-├── requirements.txt
-└── output/                 #guarda arquivos .joblib e .csv
-```
+![Texto alternativo da imagem](./assets/jenos-arch)
 
 O projeto separa duas frentes, que não se misturam:
 
