@@ -1,93 +1,93 @@
 #common.py
 
-#Tem várias defs compartilhadas entre extractor.py, calibrator.py e detector.py.
+#Has several defs shared between extractor.py, calibrator.py and detector.py.
 
-#Serve para que todas as imagens passem pelo mesmo pré-processamento antes da análise, padronizando
-#a resolução e outras etapas comuns, garantindo que as features extraídas permaneçam comparáveis entre diferentes
-#imagens e que o baseline seja consistente.
+#Ensures every image goes through the same preprocessing before analysis, standardizing
+#resolution and other common steps, guaranteeing that extracted features stay comparable across
+#different images and that the baseline stays consistent.
 
 import os
 import cv2
 import numpy as np
 import tempfile
 
-#Tamanho padrão (lado) para o qual toda imagem é normalizada antes da extração de características.
-#1024 é o teste inicial por ser grande o suficiente para preservar textura/ruído de sensor, e pequeno o suficiente
-#para manter o custo computacional baixo em lote.
+#Standard size (side) to which every image is normalized before feature extraction.
+#1024 was the initial choice for being large enough to preserve sensor texture/noise, and small enough
+#to keep computational cost low in batch.
 
-TAMANHO_PADRAO = 1024
+STANDARD_SIZE = 1024
 
-EXTENSOES_VALIDAS = {".jpg", ".jpeg", ".png"}
-
-
-def ehArquivoDeImagemValido(nomeArquivo: str) -> bool:
-    #filtra formatos que não são imagens (.wav, .pdf)
-    _, extensao = os.path.splitext(nomeArquivo)
-    return extensao.lower() in EXTENSOES_VALIDAS
+VALID_EXTENSIONS = {".jpg", ".jpeg", ".png"}
 
 
-def carregarImagemPadronizada(caminhoImagem: str) -> np.ndarray:
-#Carrega uma imagem padronizando ela para TAMANHO_PADRAOxTAMANHO_PADRAO.
+def isValidImageFile(fileName: str) -> bool:
+    #filters out formats that aren't images (.wav, .pdf)
+    _, extension = os.path.splitext(fileName)
+    return extension.lower() in VALID_EXTENSIONS
 
-#O redimensionamento preserva a proporção da imagem e, em seguida, realiza center crop para evitar distorções e a
-#introdução de bordas artificiais que poderiam afetar a extração das features.
 
-#A leitura é feita com cv2.imread(), que já garante uma imagem BGR com três canais, dispensando tratamento
-#adicional para imagens RGBA ou em escala de cinza.
-    imagem = cv2.imread(caminhoImagem, cv2.IMREAD_COLOR)
-    if imagem is None:
-        raise Exception(f"Erro ao abrir imagem: {caminhoImagem}")
+def loadStandardizedImage(imagePath: str) -> np.ndarray:
+#Loads an image, standardizing it to STANDARD_SIZExSTANDARD_SIZE.
 
-    altura, largura = imagem.shape[:2]
-    ladoMenor = min(altura, largura)
+#The resizing preserves the image's aspect ratio and then does a center crop to avoid distortion and the
+#introduction of artificial edges that could affect feature extraction.
 
-    escala = TAMANHO_PADRAO / ladoMenor
-    novaLargura = max(TAMANHO_PADRAO, int(round(largura * escala)))
-    novaAltura = max(TAMANHO_PADRAO, int(round(altura * escala)))
+#Reading is done with cv2.imread(), which already guarantees a 3-channel BGR image, so no extra
+#handling is needed for RGBA or grayscale images.
+    image = cv2.imread(imagePath, cv2.IMREAD_COLOR)
+    if image is None:
+        raise Exception(f"Error opening image: {imagePath}")
 
-    interpolacao = cv2.INTER_AREA if escala < 1.0 else cv2.INTER_CUBIC
-    imagemRedimensionada = cv2.resize(
-        imagem, (novaLargura, novaAltura), interpolation=interpolacao
+    height, width = image.shape[:2]
+    shorterSide = min(height, width)
+
+    scale = STANDARD_SIZE / shorterSide
+    newWidth = max(STANDARD_SIZE, int(round(width * scale)))
+    newHeight = max(STANDARD_SIZE, int(round(height * scale)))
+
+    interpolation = cv2.INTER_AREA if scale < 1.0 else cv2.INTER_CUBIC
+    resizedImage = cv2.resize(
+        image, (newWidth, newHeight), interpolation=interpolation
     )
 
-    # center-crop para TAMANHO_PADRAOxTAMANHO_PADRAO
-    inicioY = (novaAltura - TAMANHO_PADRAO) // 2
-    inicioX = (novaLargura - TAMANHO_PADRAO) // 2
-    imagemFinal = imagemRedimensionada[
-        inicioY:inicioY + TAMANHO_PADRAO,
-        inicioX:inicioX + TAMANHO_PADRAO
+    # center-crop to STANDARD_SIZExSTANDARD_SIZE
+    startY = (newHeight - STANDARD_SIZE) // 2
+    startX = (newWidth - STANDARD_SIZE) // 2
+    finalImage = resizedImage[
+        startY:startY + STANDARD_SIZE,
+        startX:startX + STANDARD_SIZE
     ]
 
-    return imagemFinal
+    return finalImage
 
 
-def formatoOriginalEhJpeg(caminhoImagem: str) -> bool:
-#Indica se o arquivo original está no formato JPEG.
+def originalFormatIsJpeg(imagePath: str) -> bool:
+#Indicates whether the original file is in JPEG format.
 
-#Importante para interpretar o resultado do ELA, já que a técnica explora artefatos de compressão JPEG.
-#Em imagens originalmente PNG ou de outros formatos, o ELA ainda pode fornecer informações úteis, mas sua interpretação
-#é diferente, e por esse motivo o formato original é armazenado para preservar o contexto da análise forense.
-    extensao = os.path.splitext(caminhoImagem)[1].lower()
-    return extensao in {".jpg", ".jpeg"}
+#Important for interpreting the ELA result, since the technique exploits JPEG compression artifacts.
+#For images originally in PNG or other formats, ELA can still provide useful information, but its interpretation
+#is different, which is why the original format is stored to preserve the forensic analysis context.
+    extension = os.path.splitext(imagePath)[1].lower()
+    return extension in {".jpg", ".jpeg"}
 
 
-class ArquivoTemporarioELA:
-#Context-manager responsável por criar um arquivo JPEG temporário com nome único para o cálculo do ELA.
-#Esse arquivo é removido automaticamente ao final da execução, mesmo em caso de erro, evitando acúmulo de arquivos
-#temporários e problemas de concorrência em execuções paralelas.
+class TemporaryELAFile:
+#Context manager responsible for creating a temporary JPEG file with a unique name for the ELA calculation.
+#This file is automatically removed at the end of execution, even on error, avoiding a buildup of
+#temporary files and concurrency issues in parallel runs.
 
-    def __init__(self, imagem: np.ndarray, qualidade: int = 90):
-        self.imagem = imagem
-        self.qualidade = qualidade
-        self.caminho = None
+    def __init__(self, image: np.ndarray, quality: int = 90):
+        self.image = image
+        self.quality = quality
+        self.path = None
 
     def __enter__(self) -> str:
-        descritor, self.caminho = tempfile.mkstemp(suffix=".jpg", prefix="jenos_ela_")
-        os.close(descritor)
-        cv2.imwrite(self.caminho, self.imagem, [cv2.IMWRITE_JPEG_QUALITY, self.qualidade])
-        return self.caminho
+        descriptor, self.path = tempfile.mkstemp(suffix=".jpg", prefix="jenos_ela_")
+        os.close(descriptor)
+        cv2.imwrite(self.path, self.image, [cv2.IMWRITE_JPEG_QUALITY, self.quality])
+        return self.path
 
-    def __exit__(self, tipoExcecao, valorExcecao, traceback):
-        if self.caminho and os.path.exists(self.caminho):
-            os.remove(self.caminho)
+    def __exit__(self, excType, excValue, traceback):
+        if self.path and os.path.exists(self.path):
+            os.remove(self.path)
         return False

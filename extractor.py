@@ -1,22 +1,22 @@
 #extractor.py
 
-#Esse código é o responsável por extrair as características heurísticas de uma imagem
-#usadas tanto para calibrar o baseline (calibrator.py) quanto para classificar uma imagem nova (detector.py).
+#This code is responsible for extracting the heuristic features of an image,
+#used both to calibrate the baseline (calibrator.py) and to classify a new image (detector.py).
 
-#Melhorias baseadas no primeiro protótipo que não faziam sentido ou tinhama alguns bugs: 
+#Improvements based on the first prototype that didn't make sense or had some bugs:
 
-#Toda imagem passa por carregarImagemPadronizada() (def contida em common.py) antes da extração,
-#garantindo que features sensíveis a resolução (perfil radial a FFT, densidade de bordas, energia wavelet)
-#sejam comparáveis entre imagens de tamanhos/origens diferentes.
+#Every image now goes through loadStandardizedImage() (def in common.py) before extraction,
+#ensuring that resolution-sensitive features (radial FFT profile, edge density, wavelet energy)
+#stay comparable across images of different sizes/origins.
 
-#Arquivo temporário do ELA agora é único por chamada e sempre removido (ArquivoTemporarioELA em common.py),
-#eliminando o risco de colisão em execuções paralelas ou lixo acumulado em disco não tratado nos testes iniciais.
+#The ELA temporary file is now unique per call and always removed (TemporaryELAFile in common.py),
+#eliminating the risk of collisions in parallel runs or leftover disk garbage that wasn't handled in initial tests.
 
-#O Kernel do ruído cromático passou a ser proporcional ao tamanho da imagem, como o kernel principal
-#(antes eu tinha colocado um valor fixo (3,3) para testes iniciais que era inconsistente com o restante do pipeline).
+#The chromatic noise kernel is now proportional to the image size, like the main kernel
+#(before I had a fixed value (3,3) for initial tests, which was inconsistent with the rest of the pipeline).
 
-#Agora o código guarda o formato original do arquivo (JPEG, PNG e etc) junto ao resultado, por que isso termina
-#afetando a interpretação forense do ELA dependendo do formato.
+#The code now also stores the file's original format (JPEG, PNG etc.) alongside the result, since this ends up
+#affecting the forensic interpretation of ELA depending on the format.
 
 import json
 import numpy as np
@@ -29,170 +29,170 @@ from skimage.morphology import disk
 from skimage.measure import shannon_entropy
 
 from common import (
-    carregarImagemPadronizada,
-    formatoOriginalEhJpeg,
-    ArquivoTemporarioELA,
+    loadStandardizedImage,
+    originalFormatIsJpeg,
+    TemporaryELAFile,
 )
 
 
-def calcularPerfilRadial(matrizDados):
-    centro = np.array(matrizDados.shape) // 2
-    y, x = np.indices(matrizDados.shape)
+def calculateRadialProfile(dataMatrix):
+    center = np.array(dataMatrix.shape) // 2
+    y, x = np.indices(dataMatrix.shape)
 
-    raio = np.sqrt((x - centro[1]) ** 2 + (y - centro[0]) ** 2)
-    raio = raio.astype(np.int32)
+    radius = np.sqrt((x - center[1]) ** 2 + (y - center[0]) ** 2)
+    radius = radius.astype(np.int32)
 
-    somaPorRaio = np.bincount(raio.ravel(), matrizDados.ravel())
-    contagemPorRaio = np.bincount(raio.ravel())
-    perfilRadial = somaPorRaio / (contagemPorRaio + 1e-8)
-    return perfilRadial
+    sumByRadius = np.bincount(radius.ravel(), dataMatrix.ravel())
+    countByRadius = np.bincount(radius.ravel())
+    radialProfile = sumByRadius / (countByRadius + 1e-8)
+    return radialProfile
 
 
-def extrairCaracteristicas(caminhoImagem: str) -> dict:
-    imagemOriginal = carregarImagemPadronizada(caminhoImagem)
-    ehJpeg = formatoOriginalEhJpeg(caminhoImagem)
+def extractFeatures(imagePath: str) -> dict:
+    originalImage = loadStandardizedImage(imagePath)
+    isJpeg = originalFormatIsJpeg(imagePath)
 
     #gray
-    imagemCinza = cv2.cvtColor(imagemOriginal, cv2.COLOR_BGR2GRAY)
-    alturaImagem, larguraImagem = imagemCinza.shape
+    grayImage = cv2.cvtColor(originalImage, cv2.COLOR_BGR2GRAY)
+    imageHeight, imageWidth = grayImage.shape
 
-    #kernelsize (proporcional - agora consistente em todo o pipeline)
-    tamanhoKernel = max(3, int(min(alturaImagem, larguraImagem) * 0.005))
-    if tamanhoKernel % 2 == 0:
-        tamanhoKernel += 1
+    #kernel size (proportional)
+    kernelSize = max(3, int(min(imageHeight, imageWidth) * 0.005))
+    if kernelSize % 2 == 0:
+        kernelSize += 1
 
     #noise
-    imagemDesfocada = cv2.GaussianBlur(imagemCinza, (tamanhoKernel, tamanhoKernel), 0)
-    residuoRuido = imagemCinza.astype(np.float32) - imagemDesfocada.astype(np.float32)
-    listaValorRuido = residuoRuido.flatten()
+    blurredImage = cv2.GaussianBlur(grayImage, (kernelSize, kernelSize), 0)
+    noiseResidual = grayImage.astype(np.float32) - blurredImage.astype(np.float32)
+    noiseValueList = noiseResidual.flatten()
 
-    #PRNU (aproximado)
-    imagemDenoised = cv2.fastNlMeansDenoising(imagemCinza, None, 7, 7, 21)
-    residuoPRNU = imagemCinza.astype(np.float32) - imagemDenoised.astype(np.float32)
-    listaValorPRNU = residuoPRNU.flatten()
+    #PRNU (approximate)
+    denoisedImage = cv2.fastNlMeansDenoising(grayImage, None, 7, 7, 21)
+    prnuResidual = grayImage.astype(np.float32) - denoisedImage.astype(np.float32)
+    prnuValueList = prnuResidual.flatten()
 
     #FFT
-    fftImagem = np.fft.fft2(imagemCinza)
-    fftCentralizada = np.fft.fftshift(fftImagem)
-    fftMagnitude = np.log(np.abs(fftCentralizada) + 1)
-    listaValorFFT = fftMagnitude.flatten()
-    perfilRadial = calcularPerfilRadial(fftMagnitude)
-    picosRadiais, _ = find_peaks(perfilRadial)
-    diferencaRadial = np.diff(perfilRadial)
+    fftImage = np.fft.fft2(grayImage)
+    fftCentered = np.fft.fftshift(fftImage)
+    fftMagnitude = np.log(np.abs(fftCentered) + 1)
+    fftValueList = fftMagnitude.flatten()
+    radialProfile = calculateRadialProfile(fftMagnitude)
+    radialPeaks, _ = find_peaks(radialProfile)
+    radialDifference = np.diff(radialProfile)
 
     #entropy
-    mapaEntropia = entropy(imagemCinza, disk(5))
-    listaValorEntropia = mapaEntropia.flatten()
+    entropyMap = entropy(grayImage, disk(5))
+    entropyValueList = entropyMap.flatten()
 
-    #ELA (agora com arquivo temporário seguro e único)
-    with ArquivoTemporarioELA(imagemOriginal, qualidade=90) as caminhoTemporarioELA:
-        imagemRecomprimida = cv2.imread(caminhoTemporarioELA)
-        imagemELA = cv2.absdiff(imagemOriginal, imagemRecomprimida)
-        imagemELACinza = cv2.cvtColor(imagemELA, cv2.COLOR_BGR2GRAY)
-        listaValorELA = imagemELACinza.flatten()
+    #ELA (with temporary file)
+    with TemporaryELAFile(originalImage, quality=90) as temporaryELAPath:
+        recompressedImage = cv2.imread(temporaryELAPath)
+        elaImage = cv2.absdiff(originalImage, recompressedImage)
+        elaGrayImage = cv2.cvtColor(elaImage, cv2.COLOR_BGR2GRAY)
+        elaValueList = elaGrayImage.flatten()
 
     #wavelet
-    coeficientesWavelet = pywt.wavedec2(imagemCinza, 'haar', level=2)
-    energiaWavelet = []
-    for nivel in coeficientesWavelet[1:]:
-        for subbanda in nivel:
-            energiaWavelet.append(np.mean(np.abs(subbanda)))
+    waveletCoefficients = pywt.wavedec2(grayImage, 'haar', level=2)
+    waveletEnergy = []
+    for level in waveletCoefficients[1:]:
+        for subband in level:
+            waveletEnergy.append(np.mean(np.abs(subband)))
 
     #CFA
-    linhasPares = imagemCinza[::2, :]
-    linhasImpares = imagemCinza[1::2, :]
-    minimoLinhas = min(linhasPares.shape[0], linhasImpares.shape[0])
-    linhasPares = linhasPares[:minimoLinhas]
-    linhasImpares = linhasImpares[:minimoLinhas]
+    evenRows = grayImage[::2, :]
+    oddRows = grayImage[1::2, :]
+    minRows = min(evenRows.shape[0], oddRows.shape[0])
+    evenRows = evenRows[:minRows]
+    oddRows = oddRows[:minRows]
 
-    diferencaCFA = np.mean(np.abs(
-        linhasPares.astype(np.float32) -
-        linhasImpares.astype(np.float32)
+    cfaDifference = np.mean(np.abs(
+        evenRows.astype(np.float32) -
+        oddRows.astype(np.float32)
     ))
 
-    #ruído cromático (kernel agora proporcional, igual ao restante do pipeline)
-    canalAzul, canalVerde, canalVermelho = cv2.split(imagemOriginal)
+    #chromatic noise (kernel now proportional, same as the rest of the pipeline)
+    blueChannel, greenChannel, redChannel = cv2.split(originalImage)
 
-    ruidoVermelho = np.std(
-        canalVermelho.astype(np.float32) - cv2.GaussianBlur(canalVermelho, (tamanhoKernel, tamanhoKernel), 0)
+    redNoise = np.std(
+        redChannel.astype(np.float32) - cv2.GaussianBlur(redChannel, (kernelSize, kernelSize), 0)
     )
-    ruidoVerde = np.std(
-        canalVerde.astype(np.float32) - cv2.GaussianBlur(canalVerde, (tamanhoKernel, tamanhoKernel), 0)
+    greenNoise = np.std(
+        greenChannel.astype(np.float32) - cv2.GaussianBlur(greenChannel, (kernelSize, kernelSize), 0)
     )
-    ruidoAzul = np.std(
-        canalAzul.astype(np.float32) - cv2.GaussianBlur(canalAzul, (tamanhoKernel, tamanhoKernel), 0)
+    blueNoise = np.std(
+        blueChannel.astype(np.float32) - cv2.GaussianBlur(blueChannel, (kernelSize, kernelSize), 0)
     )
 
-    #saturação
-    imagemHSV = cv2.cvtColor(imagemOriginal, cv2.COLOR_BGR2HSV)
-    canalSaturacao = imagemHSV[:, :, 1]
+    #saturation
+    hsvImage = cv2.cvtColor(originalImage, cv2.COLOR_BGR2HSV)
+    saturationChannel = hsvImage[:, :, 1]
 
-    #LAB (nomes com sufixo Lab para não colidir com os canais RGB acima)
-    imagemLAB = cv2.cvtColor(imagemOriginal, cv2.COLOR_BGR2LAB)
-    _, canalLabA, canalLabB = cv2.split(imagemLAB)
+    #LAB (names with a "Lab" suffix so they don't collide with the RGB channels above)
+    labImage = cv2.cvtColor(originalImage, cv2.COLOR_BGR2LAB)
+    _, labAChannel, labBChannel = cv2.split(labImage)
 
     #canny-edge
-    mapaBordas = cv2.Canny(imagemCinza, 100, 200)
-    densidadeBordas = np.mean(mapaBordas > 0)
+    edgeMap = cv2.Canny(grayImage, 100, 200)
+    edgeDensity = np.mean(edgeMap > 0)
 
-    caracteristicas = {
-        #RUÍDO
-        "valorRuidoDesvio": float(np.std(listaValorRuido)),
-        "valorRuidoAssimetria": float(skew(listaValorRuido)),
-        "valorRuidoCurtose": float(kurtosis(listaValorRuido)),
+    features = {
+        #NOISE
+        "noiseStdDev": float(np.std(noiseValueList)),
+        "noiseSkew": float(skew(noiseValueList)),
+        "noiseKurtosis": float(kurtosis(noiseValueList)),
         #PRNU
-        "valorPRNUDesvio": float(np.std(listaValorPRNU)),
-        "valorPRNUAssimetria": float(skew(listaValorPRNU)),
-        "valorPRNUCurtose": float(kurtosis(listaValorPRNU)),
+        "prnuStdDev": float(np.std(prnuValueList)),
+        "prnuSkew": float(skew(prnuValueList)),
+        "prnuKurtosis": float(kurtosis(prnuValueList)),
         #FFT
-        "valorFFTDesvio": float(np.std(listaValorFFT)),
-        "valorFFTAssimetria": float(skew(listaValorFFT)),
-        "valorFFTCurtose": float(kurtosis(listaValorFFT)),
+        "fftStdDev": float(np.std(fftValueList)),
+        "fftSkew": float(skew(fftValueList)),
+        "fftKurtosis": float(kurtosis(fftValueList)),
         #RADIAL FFT
-        "valorRadialDesvio": float(np.std(perfilRadial)),
-        "valorRadialPicos": int(len(picosRadiais)),
-        "valorRadialEnergia": float(np.mean(np.abs(diferencaRadial))),
-        "valorRadialCurtose": float(kurtosis(perfilRadial)),
-        #ENTROPIA
-        "valorEntropiaMedia": float(np.mean(listaValorEntropia)),
-        "valorEntropiaDesvio": float(np.std(listaValorEntropia)),
-        "valorEntropiaAssimetria": float(skew(listaValorEntropia)),
-        "valorEntropiaCurtose": float(kurtosis(listaValorEntropia)),
+        "radialStdDev": float(np.std(radialProfile)),
+        "radialPeaksCount": int(len(radialPeaks)),
+        "radialEnergy": float(np.mean(np.abs(radialDifference))),
+        "radialKurtosis": float(kurtosis(radialProfile)),
+        #ENTROPY
+        "entropyMean": float(np.mean(entropyValueList)),
+        "entropyStdDev": float(np.std(entropyValueList)),
+        "entropySkew": float(skew(entropyValueList)),
+        "entropyKurtosis": float(kurtosis(entropyValueList)),
         #ELA
-        "valorELADesvio": float(np.std(listaValorELA)),
-        "valorELAEntropia": float(shannon_entropy(imagemELACinza)),
-        "valorELACurtose": float(kurtosis(listaValorELA)),
+        "elaStdDev": float(np.std(elaValueList)),
+        "elaEntropy": float(shannon_entropy(elaGrayImage)),
+        "elaKurtosis": float(kurtosis(elaValueList)),
         #WAVELET
-        "valorWaveletMedia": float(np.mean(energiaWavelet)),
-        "valorWaveletDesvio": float(np.std(energiaWavelet)),
+        "waveletMean": float(np.mean(waveletEnergy)),
+        "waveletStdDev": float(np.std(waveletEnergy)),
         #CFA
-        "valorCFADiferenca": float(diferencaCFA),
-        #RUÍDO CROMÁTICO
-        "valorRuidoVermelho": float(ruidoVermelho),
-        "valorRuidoVerde": float(ruidoVerde),
-        "valorRuidoAzul": float(ruidoAzul),
-        #SATURAÇÃO
-        "valorSaturacaoMedia": float(np.mean(canalSaturacao)),
-        "valorSaturacaoDesvio": float(np.std(canalSaturacao)),
+        "cfaDifferenceValue": float(cfaDifference),
+        #CHROMATIC NOISE
+        "redNoiseValue": float(redNoise),
+        "greenNoiseValue": float(greenNoise),
+        "blueNoiseValue": float(blueNoise),
+        #SATURATION
+        "saturationMean": float(np.mean(saturationChannel)),
+        "saturationStdDev": float(np.std(saturationChannel)),
         #LAB
-        "valorLabADesvio": float(np.std(canalLabA)),
-        "valorLabBDesvio": float(np.std(canalLabB)),
-        #BORDAS
-        "valorDensidadeBordas": float(densidadeBordas),
+        "labAStdDev": float(np.std(labAChannel)),
+        "labBStdDev": float(np.std(labBChannel)),
+        #EDGES
+        "edgeDensityValue": float(edgeDensity),
     }
 
-    #Metadado (não usado como feature numérica direta no classificador, mas registrado para permitir análise/filtro
-    #posterior, ex: separar o desempenho do modelo para imagens de origem JPEG vs PNG).
-    caracteristicas["_metadadoFormatoOriginalJpeg"] = bool(ehJpeg)
+    #Metadata (not used as a direct numeric feature by the classifier, but recorded to allow later
+    #analysis/filtering, e.g. splitting model performance for images originally JPEG vs PNG).
+    features["_metadataOriginalFormatJpeg"] = bool(isJpeg)
 
-    return caracteristicas
+    return features
 
 
 if __name__ == "__main__":
-    caminhoImagem = input("path: ")
-    resultado = extrairCaracteristicas(caminhoImagem)
+    imagePath = input("path: ")
+    result = extractFeatures(imagePath)
 
-    with open("caracteristicas.json", "w") as arquivo:
-        json.dump(resultado, arquivo, indent=4)
+    with open("features.json", "w") as file:
+        json.dump(result, file, indent=4)
 
-    print(json.dumps(resultado, indent=4))
+    print(json.dumps(result, indent=4))

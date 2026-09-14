@@ -1,149 +1,149 @@
 # calibrator.py
 
-#Gera, para cada classe, um baseline estatístico a partir das imagens reais e um dataset de features
-#rotulado (real=0 / ia=1), utilizado posteriormente pelo train_classifier.py para treinar o modelo.
+#Generates, for each class, a statistical baseline from the real images and a labeled feature
+#dataset (real=0 / ai=1), later used by trainer.py to train the model.
 
-#Estrutura esperada:
+#Expected structure:
 #dataset/
 #    real/
-#        <classe>/*.jpg
+#        <class>/*.jpg
 #    ia/
-#        <classe>/*.jpg
+#        <class>/*.jpg
 
-#O calibrador agora da suporte a várias classes, em vez de trabalhar apenas com um único conjunto de imagens reais.
-#Agora ele filtra arquivos que não são imagens antes do processamento e faz a calibração ser mais robusta.
-#Além do baseline estatístico, agora é gerado um dataset rotulado de features, para o treinamento de um classificador
-#supervisionado.
+#The calibrator now supports multiple classes, instead of working with just a single set of real images.
+#It now filters out files that aren't images before processing, making calibration more robust.
+#Besides the statistical baseline, it now also generates a labeled feature dataset for training a
+#supervised classifier.
 
 import os
 import json
 import numpy as np
 import pandas as pd
 
-from extractor import extrairCaracteristicas
-from common import ehArquivoDeImagemValido
+from extractor import extractFeatures
+from common import isValidImageFile
 
-DIRETORIO_DATASET = "dataset"
-DIRETORIO_SAIDA = "output"
+DATASET_DIRECTORY = "dataset"
+OUTPUT_DIRECTORY = "output"
 
-def listarClasses(diretorioReal: str) -> list:
-    if not os.path.isdir(diretorioReal):
+def listClasses(realDirectory: str) -> list:
+    if not os.path.isdir(realDirectory):
         return []
     return sorted([
-        nomeClasse for nomeClasse in os.listdir(diretorioReal)
-        if os.path.isdir(os.path.join(diretorioReal, nomeClasse))
+        className for className in os.listdir(realDirectory)
+        if os.path.isdir(os.path.join(realDirectory, className))
     ])
 
 
-def extrairFeaturesDeDiretorio(diretorio: str) -> list:
-#Extrai as features de todas as imagens válidas presentes em um diretório, retornando uma lista de dicionários
-#contendo as características extraídas e o nome de cada arquivo.
-    listaFeatures = []
-    if not os.path.isdir(diretorio):
-        return listaFeatures
+def extractFeaturesFromDirectory(directory: str) -> list:
+#Extracts features from every valid image in a directory, returning a list of dictionaries
+#containing the extracted features and each file's name.
+    featureList = []
+    if not os.path.isdir(directory):
+        return featureList
 
-    for nomeArquivo in sorted(os.listdir(diretorio)):
-        if not ehArquivoDeImagemValido(nomeArquivo):
+    for fileName in sorted(os.listdir(directory)):
+        if not isValidImageFile(fileName):
             continue
 
-        caminhoCompleto = os.path.join(diretorio, nomeArquivo)
+        fullPath = os.path.join(directory, fileName)
         try:
-            caracteristicas = extrairCaracteristicas(caminhoCompleto)
-            caracteristicas["_arquivo"] = nomeArquivo
-            listaFeatures.append(caracteristicas)
-            print(f"  OK: {nomeArquivo}")
-        except Exception as erro:
-            print(f"  ERRO: {nomeArquivo} -> {erro}")
+            features = extractFeatures(fullPath)
+            features["_file"] = fileName
+            featureList.append(features)
+            print(f"  OK: {fileName}")
+        except Exception as error:
+            print(f"  ERROR: {fileName} -> {error}")
 
-    return listaFeatures
+    return featureList
 
 
-def calcularBaseline(listaCaracteristicas: list) -> dict:
-    #Baseline estatístico (media/desvio/percentis) para imagens reais.
-    if not listaCaracteristicas:
+def calculateBaseline(featureRecordList: list) -> dict:
+    #Statistical baseline (mean/stdDev/percentiles) for real images.
+    if not featureRecordList:
         return {}
 
-    nomesNumericos = [
-        chave for chave in listaCaracteristicas[0].keys()
-        if not chave.startswith("_")
+    numericNames = [
+        key for key in featureRecordList[0].keys()
+        if not key.startswith("_")
     ]
 
     baseline = {}
-    for nomeCaracteristica in nomesNumericos:
-        valores = [registro[nomeCaracteristica] for registro in listaCaracteristicas]
-        baseline[nomeCaracteristica] = {
-            "media": float(np.mean(valores)),
-            "desvioPadrao": float(np.std(valores) + 1e-8),
-            "percentil95": float(np.percentile(valores, 95)),
-            "percentil99": float(np.percentile(valores, 99)),
+    for featureName in numericNames:
+        values = [record[featureName] for record in featureRecordList]
+        baseline[featureName] = {
+            "mean": float(np.mean(values)),
+            "stdDev": float(np.std(values) + 1e-8),
+            "percentile95": float(np.percentile(values, 95)),
+            "percentile99": float(np.percentile(values, 99)),
         }
     return baseline
 
 
-def processarClasse(classe: str):
-    print(f"\nClasse: {classe}")
+def processClass(classLabel: str):
+    print(f"\nClass: {classLabel}")
 
-    diretorioReal = os.path.join(DIRETORIO_DATASET, "real", classe)
-    diretorioIA = os.path.join(DIRETORIO_DATASET, "ia", classe)
+    realDirectory = os.path.join(DATASET_DIRECTORY, "real", classLabel)
+    aiDirectory = os.path.join(DATASET_DIRECTORY, "ia", classLabel)
 
-    print(f"Extraindo features de imagens REAIS ({diretorioReal})...")
-    featuresReais = extrairFeaturesDeDiretorio(diretorioReal)
+    print(f"Extracting features from REAL images ({realDirectory})...")
+    realFeatures = extractFeaturesFromDirectory(realDirectory)
 
-    print(f"Extraindo features de imagens IA ({diretorioIA})...")
-    featuresIA = extrairFeaturesDeDiretorio(diretorioIA)
+    print(f"Extracting features from AI images ({aiDirectory})...")
+    aiFeatures = extractFeaturesFromDirectory(aiDirectory)
 
-    if len(featuresReais) == 0:
-        print(f"AVISO: nenhuma imagem real válida encontrada para a classe '{classe}'. Pulando.")
+    if len(realFeatures) == 0:
+        print(f"WARNING: no valid real image found for class '{classLabel}'. Skipping.")
         return
-    if len(featuresIA) == 0:
+    if len(aiFeatures) == 0:
         print(
-            f"AVISO: nenhuma imagem de IA encontrada para a classe '{classe}'. "
-            "O baseline será gerado, mas o dataset rotulado ficará incompleto "
-            "(train_classifier.py exige as duas classes)."
+            f"WARNING: no AI image found for class '{classLabel}'. "
+            "The baseline will be generated, but the labeled dataset will be incomplete "
+            "(trainer.py requires both classes)."
         )
 
-    os.makedirs(DIRETORIO_SAIDA, exist_ok=True)
+    os.makedirs(OUTPUT_DIRECTORY, exist_ok=True)
 
-    #baseline descritivo (só imagens reais, usando para testes)
-    baseline = calcularBaseline(featuresReais)
-    caminhoBaseline = os.path.join(DIRETORIO_SAIDA, f"baseline_{classe}.json")
-    with open(caminhoBaseline, "w") as arquivo:
-        json.dump(baseline, arquivo, indent=4)
-    print(f"Baseline salvo em: {caminhoBaseline}")
+    #descriptive baseline (real images only, used for tests)
+    baseline = calculateBaseline(realFeatures)
+    baselinePath = os.path.join(OUTPUT_DIRECTORY, f"baseline_{classLabel}.json")
+    with open(baselinePath, "w") as file:
+        json.dump(baseline, file, indent=4)
+    print(f"Baseline saved to: {baselinePath}")
 
-    #dataset rotulado (reais+IA) para treino do classificador, ideia de versão final
-    #0 = real / #1 = gerado/editado por IA
-    linhas = []
-    for registro in featuresReais:
-        linha = {chave: valor for chave, valor in registro.items() if not chave.startswith("_")}
-        linha["rotulo"] = 0 
-        linhas.append(linha)
-    for registro in featuresIA:
-        linha = {chave: valor for chave, valor in registro.items() if not chave.startswith("_")}
-        linha["rotulo"] = 1  
-        linhas.append(linha)
+    #labeled dataset (real+AI) for training the classifier, final-version idea
+    #0 = real / #1 = AI-generated/edited
+    rows = []
+    for record in realFeatures:
+        row = {key: value for key, value in record.items() if not key.startswith("_")}
+        row["label"] = 0
+        rows.append(row)
+    for record in aiFeatures:
+        row = {key: value for key, value in record.items() if not key.startswith("_")}
+        row["label"] = 1
+        rows.append(row)
 
-    dataFrame = pd.DataFrame(linhas)
-    caminhoDataset = os.path.join(DIRETORIO_SAIDA, f"features_{classe}.csv")
-    dataFrame.to_csv(caminhoDataset, index=False)
-    print(f"Dataset rotulado salvo em: {caminhoDataset} ({len(dataFrame)} amostras)")
+    dataFrame = pd.DataFrame(rows)
+    datasetPath = os.path.join(OUTPUT_DIRECTORY, f"features_{classLabel}.csv")
+    dataFrame.to_csv(datasetPath, index=False)
+    print(f"Labeled dataset saved to: {datasetPath} ({len(dataFrame)} samples)")
 
 
 def main():
-    diretorioReal = os.path.join(DIRETORIO_DATASET, "real")
-    classes = listarClasses(diretorioReal)
+    realDirectory = os.path.join(DATASET_DIRECTORY, "real")
+    classes = listClasses(realDirectory)
 
     if not classes:
         raise Exception(
-            f"Nenhuma classe encontrada em '{diretorioReal}'. "
-            f"Organize o dataset como dataset/real/<classe>/ e dataset/ia/<classe>/."
+            f"No class found in '{realDirectory}'. "
+            f"Organize the dataset as dataset/real/<class>/ and dataset/ia/<class>/."
         )
 
-    print(f"Classes encontradas: {classes}")
-    for classe in classes:
-        processarClasse(classe)
+    print(f"Classes found: {classes}")
+    for classLabel in classes:
+        processClass(classLabel)
 
-    print("\nCalibração concluída para todas as classes.")
+    print("\nCalibration completed for all classes.")
 
 
 if __name__ == "__main__":

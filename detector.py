@@ -1,19 +1,19 @@
 #detector.py
 
-#Esse código recebe uma imagem (ou um diretório de imagens, no modo batch) e estima a probabilidade de ela ter
-#sido gerada ou editada por IA, utilizando o classificador treinado por train_classifier.py para a classe indicada.
+#This code takes an image (or a directory of images, in batch mode) and estimates the probability that it was
+#generated or edited by AI, using the classifier trained by trainer.py for the given class.
 
-#Mudanças em relação ao protótipo
+#Changes compared to the prototype
 
-#O detector passou a usar cli baseada em argparse para processamento em lote e a avaliação do modelo
-#em conjuntos de teste independentes.
+#The detector now uses an argparse-based CLI for batch processing and model evaluation
+#on independent test sets.
 
-#A decisão não é mais baseada em um somatório de z-scores com pesos manuais. Agora é utilizado o modelo
-#supervisionado treinado para cada classe, mantendo um relatório de evidências fundamentado tanto na
-#importância das features quanto no desvio em relação ao baseline.
+#The decision is no longer based on a sum of z-scores with manual weights. It now uses the
+#supervised model trained for each class, keeping an evidence report grounded both in
+#feature importance and in the deviation from the baseline.
 
-#Também foi adicionado suporte ao modo batch com exportação dos resultados em CSV, facilitando a validação
-#e análise de desempenho em conjuntos de teste separados.
+#Batch mode support was also added, exporting results to CSV, which makes it easier to validate
+#and analyze performance on separate test sets.
 
 import os
 import json
@@ -22,148 +22,148 @@ import numpy as np
 import pandas as pd
 import joblib
 
-from extractor import extrairCaracteristicas
-from common import ehArquivoDeImagemValido
+from extractor import extractFeatures
+from common import isValidImageFile
 
-DIRETORIO_SAIDA = "output"
+OUTPUT_DIRECTORY = "output"
 
 
-def carregarModelo(classe: str):
-    caminhoModelo = os.path.join(DIRETORIO_SAIDA, f"modelo_{classe}.joblib")
-    if not os.path.exists(caminhoModelo):
+def loadModel(classLabel: str):
+    modelPath = os.path.join(OUTPUT_DIRECTORY, f"model_{classLabel}.joblib")
+    if not os.path.exists(modelPath):
         raise FileNotFoundError(
-            f"Modelo não encontrado: {caminhoModelo}. Rode train_classifier.py --classe {classe} primeiro."
+            f"Model not found: {modelPath}. Run trainer.py --class {classLabel} first."
         )
-    return joblib.load(caminhoModelo)
+    return joblib.load(modelPath)
 
 
-def carregarBaseline(classe: str) -> dict:
-    caminhoBaseline = os.path.join(DIRETORIO_SAIDA, f"baseline_{classe}.json")
-    if not os.path.exists(caminhoBaseline):
+def loadBaseline(classLabel: str) -> dict:
+    baselinePath = os.path.join(OUTPUT_DIRECTORY, f"baseline_{classLabel}.json")
+    if not os.path.exists(baselinePath):
         return {}
-    with open(caminhoBaseline, "r") as arquivo:
-        return json.load(arquivo)
+    with open(baselinePath, "r") as file:
+        return json.load(file)
 
 
-def gerarEvidencias(caracteristicas: dict, baseline: dict, modelo, colunasFeature: list, top_n: int = 5) -> list:
-#Gera uma lista de evidências legíveis, combinando o quanto a feature se desvia do baseline de imagens reais (z-score)
-#e a importância dessa feature para o modelo treinado (quando disponível)
+def generateEvidence(features: dict, baseline: dict, model, featureColumns: list, topN: int = 5) -> list:
+#Generates a list of readable evidence, combining how much the feature deviates from the real-image baseline
+#(z-score) with how important that feature is to the trained model (when available).
 
-    importancias = {}
-    if hasattr(modelo, "feature_importances_"):
-        importancias = dict(zip(colunasFeature, modelo.feature_importances_))
+    importances = {}
+    if hasattr(model, "feature_importances_"):
+        importances = dict(zip(featureColumns, model.feature_importances_))
 
-    evidencias = []
-    for nomeFeature in colunasFeature:
-        if nomeFeature not in baseline or nomeFeature not in caracteristicas:
+    evidenceList = []
+    for featureName in featureColumns:
+        if featureName not in baseline or featureName not in features:
             continue
-        media = baseline[nomeFeature]["media"]
-        desvio = baseline[nomeFeature]["desvioPadrao"]
-        if desvio == 0:
+        mean = baseline[featureName]["mean"]
+        stdDev = baseline[featureName]["stdDev"]
+        if stdDev == 0:
             continue
 
-        zScore = abs((caracteristicas[nomeFeature] - media) / desvio)
-        pesoImportancia = importancias.get(nomeFeature, 0.0)
+        zScore = abs((features[featureName] - mean) / stdDev)
+        importanceWeight = importances.get(featureName, 0.0)
 
-        #score combinado: desvio estatístico ponderado pela relevância da feature no modelo
-        scoreEvidencia = zScore * (pesoImportancia if importancias else 1.0)
+        #combined score: statistical deviation weighted by the feature's relevance in the model
+        evidenceScore = zScore * (importanceWeight if importances else 1.0)
 
         if zScore > 2:
-            evidencias.append({
-                "feature": nomeFeature,
+            evidenceList.append({
+                "feature": featureName,
                 "zScore": round(float(zScore), 2),
-                "importanciaModelo": round(float(pesoImportancia), 4) if importancias else None,
-                "scoreEvidencia": round(float(scoreEvidencia), 4),
+                "modelImportance": round(float(importanceWeight), 4) if importances else None,
+                "evidenceScore": round(float(evidenceScore), 4),
             })
 
-    evidencias.sort(key=lambda evidencia: evidencia["scoreEvidencia"], reverse=True)
-    return evidencias[:top_n]
+    evidenceList.sort(key=lambda evidence: evidence["evidenceScore"], reverse=True)
+    return evidenceList[:topN]
 
 
-def analisarImagem(caminhoImagem: str, classe: str, modeloCarregado=None, baseline=None) -> dict:
-    if modeloCarregado is None:
-        modeloCarregado = carregarModelo(classe)
+def analyzeImage(imagePath: str, classLabel: str, loadedModel=None, baseline=None) -> dict:
+    if loadedModel is None:
+        loadedModel = loadModel(classLabel)
     if baseline is None:
-        baseline = carregarBaseline(classe)
+        baseline = loadBaseline(classLabel)
 
-    modelo = modeloCarregado["modelo"]
-    colunasFeature = modeloCarregado["colunasFeature"]
+    model = loadedModel["model"]
+    featureColumns = loadedModel["featureColumns"]
 
-    caracteristicas = extrairCaracteristicas(caminhoImagem)
-    caracteristicasNumericas = {chave: valor for chave, valor in caracteristicas.items() if not chave.startswith("_")}
+    features = extractFeatures(imagePath)
+    numericFeatures = {key: value for key, value in features.items() if not key.startswith("_")}
 
-    vetor = np.array([[caracteristicasNumericas.get(nomeFeature, 0.0) for nomeFeature in colunasFeature]])
-    probabilidadeIA = float(modelo.predict_proba(vetor)[0, 1])
+    vector = np.array([[numericFeatures.get(featureName, 0.0) for featureName in featureColumns]])
+    aiProbability = float(model.predict_proba(vector)[0, 1])
 
-    evidencias = gerarEvidencias(caracteristicasNumericas, baseline, modelo, colunasFeature)
+    evidenceList = generateEvidence(numericFeatures, baseline, model, featureColumns)
 
     return {
-        "arquivo": os.path.basename(caminhoImagem),
-        "classe": classe,
-        "probabilidadeIA": round(probabilidadeIA, 4),
-        "formatoOriginalJpeg": caracteristicas.get("_metadadoFormatoOriginalJpeg"),
-        "evidencias": evidencias,
+        "file": os.path.basename(imagePath),
+        "classLabel": classLabel,
+        "aiProbability": round(aiProbability, 4),
+        "originalFormatJpeg": features.get("_metadataOriginalFormatJpeg"),
+        "evidenceList": evidenceList,
     }
 
 
-def modoUnico(caminhoImagem: str, classe: str):
-    resultado = analisarImagem(caminhoImagem, classe)
-    print(json.dumps(resultado, indent=4, ensure_ascii=False))
+def singleMode(imagePath: str, classLabel: str):
+    result = analyzeImage(imagePath, classLabel)
+    print(json.dumps(result, indent=4, ensure_ascii=False))
     print("-" * 40)
-    print(f"Probabilidade estimada de IA: {resultado['probabilidadeIA'] * 100:.2f}%")
-    if not resultado["formatoOriginalJpeg"]:
+    print(f"Estimated AI probability: {result['aiProbability'] * 100:.2f}%")
+    if not result["originalFormatJpeg"]:
         print(
-            "Nota: imagem original não é JPEG - a análise de ELA tem "
-            "confiabilidade reduzida para este arquivo (ver documentação do método)."
+            "Note: the original image is not JPEG - ELA analysis has "
+            "reduced reliability for this file (see the method's documentation)."
         )
-    if resultado["evidencias"]:
-        print("\nPrincipais evidências:")
-        for evidencia in resultado["evidencias"]:
-            print(f"  {evidencia['feature']}: z={evidencia['zScore']} (importância no modelo: {evidencia['importanciaModelo']})")
+    if result["evidenceList"]:
+        print("\nTop evidence:")
+        for evidence in result["evidenceList"]:
+            print(f"  {evidence['feature']}: z={evidence['zScore']} (model importance: {evidence['modelImportance']})")
     else:
-        print("\nNenhuma evidência estatística relevante (z > 2) encontrada.")
+        print("\nNo relevant statistical evidence found (z > 2).")
 
 
-def modoBatch(diretorio: str, classe: str, caminhoSaida: str):
-    modeloCarregado = carregarModelo(classe)
-    baseline = carregarBaseline(classe)
+def batchMode(directory: str, classLabel: str, outputPath: str):
+    loadedModel = loadModel(classLabel)
+    baseline = loadBaseline(classLabel)
 
-    linhas = []
-    for nomeArquivo in sorted(os.listdir(diretorio)):
-        if not ehArquivoDeImagemValido(nomeArquivo):
+    rows = []
+    for fileName in sorted(os.listdir(directory)):
+        if not isValidImageFile(fileName):
             continue
-        caminhoCompleto = os.path.join(diretorio, nomeArquivo)
+        fullPath = os.path.join(directory, fileName)
         try:
-            resultado = analisarImagem(caminhoCompleto, classe, modeloCarregado, baseline)
-            linhas.append({
-                "arquivo": resultado["arquivo"],
-                "probabilidadeIA": resultado["probabilidadeIA"],
-                "formatoOriginalJpeg": resultado["formatoOriginalJpeg"],
+            result = analyzeImage(fullPath, classLabel, loadedModel, baseline)
+            rows.append({
+                "file": result["file"],
+                "aiProbability": result["aiProbability"],
+                "originalFormatJpeg": result["originalFormatJpeg"],
             })
-            print(f"OK: {nomeArquivo} -> {resultado['probabilidadeIA'] * 100:.2f}%")
-        except Exception as erro:
-            print(f"ERRO: {nomeArquivo} -> {erro}")
+            print(f"OK: {fileName} -> {result['aiProbability'] * 100:.2f}%")
+        except Exception as error:
+            print(f"ERROR: {fileName} -> {error}")
 
-    dataFrame = pd.DataFrame(linhas)
-    dataFrame.to_csv(caminhoSaida, index=False)
-    print(f"\nResultados salvos em: {caminhoSaida}")
+    dataFrame = pd.DataFrame(rows)
+    dataFrame.to_csv(outputPath, index=False)
+    print(f"\nResults saved to: {outputPath}")
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Jenos - detecção heurística de imagens geradas/editadas por IA.")
-    parser.add_argument("--classe", required=True, help="Classe do modelo a usar (ex: faces, paisagens)")
+    parser = argparse.ArgumentParser(description="Jenos - heuristic detection of AI-generated/edited images.")
+    parser.add_argument("--class", dest="classLabel", required=True, help="Model class to use (e.g.: faces, landscapes)")
 
-    grupo = parser.add_mutually_exclusive_group(required=True)
-    grupo.add_argument("--imagem", help="Caminho de uma única imagem")
-    grupo.add_argument("--dir", help="Diretório com várias imagens (modo batch)")
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument("--image", help="Path of a single image")
+    group.add_argument("--dir", help="Directory with several images (batch mode)")
 
-    parser.add_argument("--saida", default="output/resultados_batch.csv", help="CSV de saída no modo batch")
+    parser.add_argument("--output", dest="outputPath", default="output/results_batch.csv", help="Output CSV for batch mode")
     args = parser.parse_args()
 
-    if args.imagem:
-        modoUnico(args.imagem, args.classe)
+    if args.image:
+        singleMode(args.image, args.classLabel)
     else:
-        modoBatch(args.dir, args.classe, args.saida)
+        batchMode(args.dir, args.classLabel, args.outputPath)
 
 
 if __name__ == "__main__":

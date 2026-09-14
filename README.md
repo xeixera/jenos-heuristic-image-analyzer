@@ -1,53 +1,51 @@
 # jenos-heuristic-image-analyzer
 
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue)
-![OpenCV](https://img.shields.io/badge/OpenCV-an%C3%A1lise%20heur%C3%ADstica-red)
+![OpenCV](https://img.shields.io/badge/OpenCV-heuristic%20analysis-red)
 ![scikit--learn](https://img.shields.io/badge/scikit--learn-RandomForest-orange)
-![Status](https://img.shields.io/badge/status-em%20desenvolvimento-yellow)
-![License](https://img.shields.io/badge/license-MIT-green)
+![Status](https://img.shields.io/badge/status-in%20development-yellow)
 
-Ferramenta de perícia digital que estima a probabilidade de uma imagem (`.jpg`, `.png`) ter sido **gerada ou manipulada por IA**, usando métodos heurísticos clássicos de análise forense (em vez de uma rede neural "caixa-preta"). O resultado vem sempre acompanhado das características que mais pesaram na decisão (explicabilidade).
 
-## Sumário
+Digital forensics tool that estimates the probability that an image (`.jpg`, `.png`) was **generated or manipulated by AI**, using classic heuristic forensic-analysis methods (instead of a "black-box" neural network). The result always comes with the features that weighed most heavily in the decision.
 
-1. [Como funciona](#1-como-funciona)
-2. [Estrutura do código](#2-estrutura-do-código)
-3. [Instalação](#3-instalação)
-4. [Estrutura de dataset](#4-estrutura-de-dataset)
-5. [Uso — ordem de execução](#5-uso--ordem-de-execução)
-6. [Limitações conhecidas](#6-limitações-conhecidas)
+## Table of contents
+
+1. [How it works](#1-how-it-works)
+2. [Code structure](#2-code-structure)
+3. [Installation](#3-installation)
+4. [Dataset structure](#4-dataset-structure)
+5. [Usage](#5-usage--execution-order)
+6. [Known limitations](#6-known-limitations)
 
 ---
 
-## 1. Como funciona
+## 1. How it works
 
-Cada imagem passa por **27 análises heurísticas**: ELA, análise de ruído/PRNU, FFT, entropia, wavelet, CFA, ruído cromático, saturação/LAB e densidade de bordas. Esses valores alimentam um classificador supervisionado (RandomForest), treinado previamente com imagens reais e geradas por IA, que devolve:
+Each image goes through **27 heuristic analyses**: ELA, noise/PRNU analysis, FFT, entropy, wavelet, CFA, chromatic noise, saturation/LAB, and edge density. These values feed a supervised classifier (RandomForest), pre-trained on real and AI-generated images. Which returns the estimated probability that the image was AI-generated/manipulated and the features that weighed most heavily in that decision (evidence report).
 
-- a probabilidade estimada da imagem ser gerada/manipulada por IA;
-- as características que mais pesaram nessa decisão (relatório de evidências).
+## 2. Code structure
 
-## 2. Estrutura do código
+![](./assets/jenos-arch.png)
 
-![Texto alternativo da imagem](./assets/jenos-arch)
+The project separates two fronts that don't mix:
 
-O projeto separa duas frentes, que não se misturam:
-
-| Frente | Arquivos | Quem usa |
+| Front | Files | Who uses it |
 |---|---|---|
-| Calibração/treino | `calibrator.py`, `trainer.py` | Só quem desenvolve/valida o modelo gerando os artefatos (`.json`, `.joblib`) |
-| Uso | `detector.py` | Análise do dia a dia — só carrega os artefatos prontos, não treina nada |
+| Calibration/training | `calibrator.py`, `trainer.py` | Only whoever develops/validates the model, generating the artifacts (`.json`, `.joblib`) |
+| Usage | `detector.py` | Final product, only loads the ready artifacts and doesn't train anything |
 
-**`common.py`** garante que toda imagem ,no treino e no uso, passe pela mesma padronização (resize para 1024×1024 e isolamento seguro do arquivo temporário do ELA) evitando que resolução do arquivo vire um atalho de decisão no lugar de autenticidade.
+**`common.py`** ensures every image, in both training and usage, goes through the same standardization (resize to 1024×1024 and safe isolation of the ELA temporary file), preventing the file's resolution from becoming a decision shortcut instead of authenticity.
 
-**`trainer.py`** treina um classificador binário (RandomForest por padrão, `--modelo logistic` como alternativa) a partir de imagens reais e IA já rotuladas, reportando acurácia, precisão, recall, F1, AUC-ROC e matriz de confusão.
+**`trainer.py`** trains a binary classifier (RandomForest by default, `--model logistic` as an alternative) from already-labeled real and AI images, reporting accuracy, precision, recall, F1, AUC-ROC, and confusion matrix.
 
-## 3. Instalação
+## 3. Installation
 
 ```bash
+git clone https://github.com/xeixera/jenos-image-heuristic-analyzer.git
 pip install -r requirements.txt
 ```
 
-## 4. Estrutura de dataset
+## 4. Dataset structure
 
 ```
 dataset/
@@ -59,43 +57,39 @@ dataset/
         <custom>/
 ```
 
-Cada subpasta de `dataset/real/` define uma classe, detectada automaticamente pelo `calibrator.py`.
+Each subfolder of `dataset/real/` defines a class, automatically detected by `calibrator.py`.
 
-> **Atenção:** garanta variação de resolução nativa dentro de cada classe, sobreposta entre `real` e `ia`. Se uma classe vier toda de uma única resolução e a outra de outra, o modelo pode aprender a distinguir origem do arquivo em vez de autenticidade (desconfie de acurácia/AUC perfeitos).
+> **Warning:** for train with your dataset make sure there's native resolution variation within each class, overlapping between `real` and `ia`. If one class comes entirely from a single resolution and the other from a different one, the model may learn to distinguish file origin instead of authenticity (be suspicious of perfect accuracy/AUC).
 
-## 5. Uso — ordem de execução
+## 5. Usage
 
-```
-calibrator.py;  trainer.py --class <classe>;   detector.py --class <classe> --image/--dir            
-```
-
-**Passo 1 — Calibrar** (todas as classes de uma vez):
+**Step 1 — Calibrate** (all classes at once):
 ```bash
 python3 calibrator.py
 ```
-Gera `output/baseline_<classe>.json` e `output/features_<classe>.csv`.
+Generates `output/baseline_<class>.json` and `output/features_<class>.csv`.
 
-**Passo 2 — Treinar** (uma classe por vez):
+**Step 2 — Train** (one class at a time):
 ```bash
 python3 trainer.py --class faces
 ```
 
-Opcional: `--model {random-forest, logistic}`, `--holdout 0.25`.
+Optional: `--model {random-forest, logistic}`, `--holdout 0.25`.
 
-Gera `output/modelo_<classe>.joblib` e `output/metricas_<classe>.json`.
+Generates `output/modelo_<class>.joblib` and `output/metricas_<class>.json`.
 
-**Passo 3 — Analisar**:
+**Step 3 — Analyze**:
 ```bash
-# imagem única
-python3 detector.py --class faces --image caminho/imagem.jpg
+# single image
+python3 detector.py --class faces --image path/image.jpg
 
-# lote (diretório inteiro -> CSV)
-python3 detector.py --class faces --dir dataset/teste/faces --output output/resultados.csv
+# batch (CSV)
+python3 detector.py --class faces --dir dataset/test/faces --output output/resultados.csv
 ```
 
-## 6. Limitações conhecidas
+## 6. Known limitations
 
-- **ELA em PNG**: o sinal ainda é calculado, mas seu significado forense é mais fraco (a técnica pressupõe dupla compressão JPEG). O metadado `_metadadoFormatoOriginalJpeg` permite segmentar essa análise depois.
-- **Diversidade de geradores de IA**: treinar com um único gerador tende a ensinar o modelo a reconhecer aquele gerador específico, não "IA em geral".
-- **Seleção de classe manual**: hoje o `--classe` é informado à mão; um classificador de cena automático é uma extensão futura natural. (Sendo implementado)
-- **Interface gráfica**: planejada como app desktop (uso por outros peritos) onde o terminal continua funcionando de forma independente. (Sendo implementado)
+- **ELA on PNG**: the signal is still computed, but its forensic meaning is weaker (the technique assumes double JPEG compression). The `_metadataOriginalFormatJpeg` metadata field lets you segment this analysis later.
+- **AI generator diversity**: training with a single generator tends to teach the model to recognize that specific generator, not "AI in general".
+- **Manual class selection**: today `--class` is entered by hand; an automatic scene classifier is a natural future extension. (Being implemented)
+- **UI**: planned as a desktop app (for use by other examiners), where the terminal keeps working independently. (Being implemented)
