@@ -1,7 +1,7 @@
 #extractor.py
 
 #This code is responsible for extracting the heuristic features of an image,
-#used both to calibrate the baseline (calibrator.py) and to classify a new image (detector.py).
+#used both to calibrate the baseline (builder.py) and to classify a new image (detector.py).
 
 #Improvements based on the first prototype that didn't make sense or had some bugs:
 

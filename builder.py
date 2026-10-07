@@ -1,4 +1,4 @@
-# calibrator.py
+#builder.py
 
 #Generates, for each class, a statistical baseline from the real images and a labeled feature
 #dataset (real=0 / ai=1), later used by trainer.py to train the model.
@@ -10,8 +10,8 @@
 #    ia/
 #        <class>/*.jpg
 
-#The calibrator now supports multiple classes, instead of working with just a single set of real images.
-#It now filters out files that aren't images before processing, making calibration more robust.
+#The builder now supports multiple classes, instead of working with just a single set of real images.
+#It now filters out files that aren't images before processing, making the build more robust.
 #Besides the statistical baseline, it now also generates a labeled feature dataset for training a
 #supervised classifier.
 
@@ -143,7 +143,7 @@ def main():
     for classLabel in classes:
         processClass(classLabel)
 
-    print("\nCalibration completed for all classes.")
+    print("\nBuild completed for all classes.")
 
 
 if __name__ == "__main__":

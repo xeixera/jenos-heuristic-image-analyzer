@@ -1,6 +1,6 @@
 #common.py
 
-#Has several defs shared between extractor.py, calibrator.py and detector.py.
+#Has several defs shared between extractor.py, builder.py and detector.py.
 
 #Ensures every image goes through the same preprocessing before analysis, standardizing
 #resolution and other common steps, guaranteeing that extracted features stay comparable across
